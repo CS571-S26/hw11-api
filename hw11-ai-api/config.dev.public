@@ -1,0 +1,8 @@
+{
+    "SESSION_LENGTH": 3600,
+    "TIMEOUT_WINDOW_LENGTH": 60,
+    "TIMEOUT_WINDOW_REQS": 15,
+    "IS_REMOTELY_HOSTED": false,
+    "LOG_IPS": false,
+    "MAX_INPUT_LENGTH": 4000
+}
