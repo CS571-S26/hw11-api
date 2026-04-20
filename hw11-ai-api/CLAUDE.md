@@ -13,21 +13,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-This is an Express API that proxies requests to Azure-hosted GPT-4o Mini. It runs on port 58111 and is part of the CS571 course infrastructure (`@cs571/api-framework`).
+This is an Express API that proxies requests to Azure-hosted GPT-5 Mini. It runs on port 58111 and is part of the CS571 course infrastructure (`@cs571/api-framework`).
 
-### Single unified endpoint: `POST /completions`
+### Single unified endpoint: `POST /responses`
 
-All AI functionality is served through one route. The request body is always a JSON object with:
-- `messages` (required) — array of `{role, content}` chat objects
-- `response_schema` (optional) — JSON Schema object; when present, the response is structured JSON instead of `{msg: string}`
+All AI functionality is served through one route. The request body is a JSON object with:
+- `messages` (required) — array of input items: chat messages (`{role, content}`), `function_call`, or `function_call_output`
+- `tools` (optional) — array of tool definitions the model may call
+- `tool_choice` (optional) — `"auto"` (default), `"none"`, `"required"`, or a specific tool
 
-The route handles: message validation, content length checks, DB logging, OpenAI API call construction, and response formatting. Schema preparation (`prepareSchema`) recursively adds `additionalProperties: false` and `required` arrays to make schemas strict-compatible with OpenAI.
+The route handles: message validation, content length checks, DB logging, OpenAI API call construction, and response formatting. When the model calls tools, the response is `{tool_calls: [{call_id, name, arguments}, ...]}`; otherwise it is `{msg: string}`.
 
 ### Config system
 
 Two config interfaces extend the framework defaults:
 - `HW11PublicConfig` — `IS_REMOTELY_HOSTED` (enables DB logging), `MAX_INPUT_LENGTH` (content length cap)
-- `HW11SecretConfig` — Azure OpenAI credentials (`AI_COMPLETIONS_URL`, `AI_COMPLETIONS_SECRET`, `AI_COMPLETIONS_MAX_RESPONSE`), MySQL connection params
+- `HW11SecretConfig` — Azure OpenAI credentials (`AI_RESPONSES_URL`, `AI_RESPONSES_SECRET`, `AI_RESPONSES_MAX_RESPONSE`), MySQL connection params
 
 Config files are loaded from paths set by env vars `CS571_PUBLIC_CONFIG_PATH` and `CS571_PRIVATE_CONFIG_PATH`. Dev configs are `config.dev.public` / `config.dev.secret` in the repo root.
 

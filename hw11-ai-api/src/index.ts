@@ -5,7 +5,7 @@ import { CS571Initializer, CS571InitOptions } from '@cs571/api-framework'
 import HW11PublicConfig from './model/configs/hw11-public-config';
 import HW11SecretConfig from './model/configs/hw11-secret-config';
 import { CS571HW11DbConnector } from './services/hw11-db-connector';
-import { CS571AICompletionsRoute } from './routes/completions';
+import { CS571AIResponsesRoute } from './routes/responses';
 
 console.log("Welcome to HW11 AI!");
 
@@ -34,7 +34,7 @@ const db = new CS571HW11DbConnector(appBundle.config);
 db.init();
 
 appBundle.router.addRoutes([
-  new CS571AICompletionsRoute(db, appBundle.config.PUBLIC_CONFIG, appBundle.config.SECRET_CONFIG)
+  new CS571AIResponsesRoute(db, appBundle.config.PUBLIC_CONFIG, appBundle.config.SECRET_CONFIG)
 ])
 
 app.listen(appBundle.config.PORT, () => {

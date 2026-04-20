@@ -8,9 +8,9 @@ import OpenAIMessage from '../model/openai-message';
 import OpenAIMessageRole from '../model/openai-message-role';
 import HW11PublicConfig from '../model/configs/hw11-public-config';
 
-export class CS571AICompletionsRoute implements CS571Route {
+export class CS571AIResponsesRoute implements CS571Route {
 
-    public static readonly ROUTE_NAME: string = (process.env['CS571_BASE_PATH'] ?? "") + '/completions';
+    public static readonly ROUTE_NAME: string = (process.env['CS571_BASE_PATH'] ?? "") + '/responses';
 
     private readonly connector: CS571HW11DbConnector;
     private readonly publicConfig: HW11PublicConfig;
@@ -23,7 +23,7 @@ export class CS571AICompletionsRoute implements CS571Route {
     }
 
     public addRoute(app: Express): void {
-        app.post(CS571AICompletionsRoute.ROUTE_NAME, async (req, res) => {
+        app.post(CS571AIResponsesRoute.ROUTE_NAME, async (req, res) => {
             let isShort = req.query?.shortContext ? Boolean(req.query.shortContext) : false;
 
             const body = req.body;
@@ -36,7 +36,7 @@ export class CS571AICompletionsRoute implements CS571Route {
 
             let inputItems: any[];
             try {
-                inputItems = CS571AICompletionsRoute.validateInput(body.messages);
+                inputItems = CS571AIResponsesRoute.validateInput(body.messages);
             } catch (e) {
                 res.status(400).send({
                     msg: "The request body does not contain a valid list of chat objects."
@@ -44,16 +44,8 @@ export class CS571AICompletionsRoute implements CS571Route {
                 return;
             }
 
-            const responseSchema = body.response_schema;
             const tools = body.tools;
             const toolChoice = body.tool_choice;
-
-            if (responseSchema !== undefined && typeof responseSchema !== 'object') {
-                res.status(400).send({
-                    msg: "The 'response_schema' must be a JSON schema object."
-                });
-                return;
-            }
 
             if (tools !== undefined) {
                 if (!Array.isArray(tools) || !tools.every((t: any) =>
@@ -67,9 +59,32 @@ export class CS571AICompletionsRoute implements CS571Route {
                 }
             }
 
+            const responseSchema = body.response_schema;
+            if (responseSchema !== undefined) {
+                if (typeof responseSchema !== 'object' || responseSchema === null || Array.isArray(responseSchema)) {
+                    res.status(400).send({
+                        msg: "The 'response_schema' must be a JSON Schema object."
+                    });
+                    return;
+                }
+                if (responseSchema.type !== 'object') {
+                    res.status(400).send({
+                        msg: "The 'response_schema' must have type 'object' at the root level."
+                    });
+                    return;
+                }
+                const schemaError = CS571AIResponsesRoute.validateSchema(responseSchema);
+                if (schemaError) {
+                    res.status(400).send({
+                        msg: schemaError
+                    });
+                    return;
+                }
+            }
+
             const len = inputItems.reduce((acc: number, item: any) => {
                 if (item.content) return acc + item.content.length;
-                if (item.arguments) return acc + item.arguments.length;
+                if (item.arguments) return acc + JSON.stringify(item.arguments).length;
                 if (item.output) return acc + item.output.length;
                 return acc;
             }, 0);
@@ -88,26 +103,15 @@ export class CS571AICompletionsRoute implements CS571Route {
                 const openAIBody: any = {
                     input: inputItems.map((item: any) => {
                         if (item.type === 'function_call') {
-                            return { type: item.type, call_id: item.call_id, name: item.name, arguments: item.arguments };
+                            return { type: item.type, call_id: item.call_id, name: item.name, arguments: JSON.stringify(item.arguments) };
                         } else if (item.type === 'function_call_output') {
                             return { type: item.type, call_id: item.call_id, output: item.output };
                         } else {
                             return { role: item.role, content: item.content };
                         }
                     }),
-                    max_output_tokens: this.secretConfig.AI_COMPLETIONS_MAX_RESPONSE
+                    max_output_tokens: this.secretConfig.AI_RESPONSES_MAX_RESPONSE
                 };
-
-                if (responseSchema) {
-                    openAIBody.text = {
-                        format: {
-                            type: "json_schema",
-                            name: "structured_output",
-                            strict: true,
-                            schema: CS571AICompletionsRoute.prepareSchema(responseSchema)
-                        }
-                    };
-                }
 
                 if (tools) {
                     openAIBody.tools = tools;
@@ -116,27 +120,57 @@ export class CS571AICompletionsRoute implements CS571Route {
                     }
                 }
 
-                const resp = await fetch(this.secretConfig.AI_COMPLETIONS_URL, {
+                if (responseSchema) {
+                    openAIBody.text = {
+                        format: {
+                            type: "json_schema",
+                            name: "structured_output",
+                            strict: true,
+                            schema: CS571AIResponsesRoute.prepareSchema(responseSchema)
+                        }
+                    };
+                }
+
+                const resp = await fetch(this.secretConfig.AI_RESPONSES_URL, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "api-key": this.secretConfig.AI_COMPLETIONS_SECRET
+                        "api-key": this.secretConfig.AI_RESPONSES_SECRET
                     },
-                    body: JSON.stringify(openAIBody)
+                    body: JSON.stringify({...openAIBody, model: 'gpt-5-mini'})
                 });
                 const data = await resp.json();
 
                 const functionCalls = data.output.filter((item: any) => item.type === 'function_call');
                 if (functionCalls.length > 0) {
                     res.status(200).send({
-                        tool_calls: functionCalls
+                        tool_calls: functionCalls.map((fc: any) => {
+                            let parsedArgs: any = {};
+                            try {
+                                parsedArgs = fc.arguments ? JSON.parse(fc.arguments) : {};
+                            } catch {
+                                parsedArgs = fc.arguments;
+                            }
+                            return {
+                                call_id: fc.call_id,
+                                name: fc.name,
+                                arguments: parsedArgs
+                            };
+                        })
                     });
                 } else {
                     const messageOutput = data.output.find((item: any) => item.type === 'message');
                     const text = messageOutput?.content?.find((c: any) => c.type === 'output_text')?.text ?? "";
                     if (responseSchema) {
-                        const content = JSON.parse(text);
-                        res.status(200).send(content);
+                        let parsed: any;
+                        try {
+                            parsed = JSON.parse(text);
+                        } catch {
+                            parsed = text;
+                        }
+                        res.status(200).send({
+                            output: parsed
+                        });
                     } else {
                         res.status(200).send({
                             msg: text
@@ -166,7 +200,8 @@ export class CS571AICompletionsRoute implements CS571Route {
             return item.type === 'function_call' &&
                    typeof item.call_id === 'string' &&
                    typeof item.name === 'string' &&
-                   typeof item.arguments === 'string';
+                   typeof item.arguments === 'object' &&
+                   item.arguments !== null;
         };
 
         const isValidFunctionCallOutput = (item: any) => {
@@ -184,35 +219,78 @@ export class CS571AICompletionsRoute implements CS571Route {
         return input;
     }
 
+    private static validateSchema(schema: any): string | null {
+        const validTypes = ['string', 'number', 'integer', 'boolean', 'object', 'array', 'null'];
+
+        const validate = (s: any, path: string = ''): string | null => {
+            if (!s || typeof s !== 'object') return null;
+
+            if (s.type && !validTypes.includes(s.type)) {
+                return `Invalid type '${s.type}' at ${path || 'root'}. Must be one of: ${validTypes.join(', ')}.`;
+            }
+
+            if (s.type === 'object') {
+                if (!s.properties || typeof s.properties !== 'object' || Array.isArray(s.properties)) {
+                    return `Object schema at ${path || 'root'} must have a 'properties' object.`;
+                }
+                for (const key of Object.keys(s.properties)) {
+                    const err = validate(s.properties[key], `${path}.properties.${key}`);
+                    if (err) return err;
+                }
+            }
+
+            if (s.type === 'array') {
+                if (!s.items) {
+                    return `Array schema at ${path || 'root'} must have an 'items' field.`;
+                }
+                const err = validate(s.items, `${path}.items`);
+                if (err) return err;
+            }
+
+            if (s.anyOf) {
+                if (!Array.isArray(s.anyOf)) {
+                    return `'anyOf' at ${path || 'root'} must be an array.`;
+                }
+                for (let i = 0; i < s.anyOf.length; i++) {
+                    const err = validate(s.anyOf[i], `${path}.anyOf[${i}]`);
+                    if (err) return err;
+                }
+            }
+
+            return null;
+        };
+
+        return validate(schema);
+    }
+
     private static prepareSchema(schema: any): any {
         if (!schema || typeof schema !== 'object') return schema;
 
         if (Array.isArray(schema)) {
-            return schema.map(CS571AICompletionsRoute.prepareSchema);
+            return schema.map(CS571AIResponsesRoute.prepareSchema);
         }
 
         const result: any = { ...schema };
 
         if (result.type === 'object' && result.properties) {
             result.additionalProperties = false;
-            result.required = Object.keys(result.properties);
             for (const key of Object.keys(result.properties)) {
-                result.properties[key] = CS571AICompletionsRoute.prepareSchema(result.properties[key]);
+                result.properties[key] = CS571AIResponsesRoute.prepareSchema(result.properties[key]);
             }
         }
 
         if (result.items) {
-            result.items = CS571AICompletionsRoute.prepareSchema(result.items);
+            result.items = CS571AIResponsesRoute.prepareSchema(result.items);
         }
 
         if (result.anyOf) {
-            result.anyOf = result.anyOf.map(CS571AICompletionsRoute.prepareSchema);
+            result.anyOf = result.anyOf.map(CS571AIResponsesRoute.prepareSchema);
         }
 
         return result;
     }
 
     public getRouteName(): string {
-        return CS571AICompletionsRoute.ROUTE_NAME;
+        return CS571AIResponsesRoute.ROUTE_NAME;
     }
 }

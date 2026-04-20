@@ -1,26 +1,28 @@
 # CS571 S26 AI API Documentation
 
-Used to generate a response using GPT-4o Mini. **You are responsible for all traffic coming from your `X-CS571-ID`.** Failing to include a valid `X-CS571-ID` will result in a `401`.
+Used to generate a response using GPT-5 Mini. **You are responsible for all traffic coming from your `X-CS571-ID`.** Failing to include a valid `X-CS571-ID` will result in a `401`.
 
-## AI Completions
+## AI Responses
 
-### `/completions` 
+### `/responses` 
 
 #### Request
 
-`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/completions`
+`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/ai/responses`
 
-You must request an AI completion with a JSON object containing `messages` — a list of input items. Each item is one of:
+You must request an AI response with a JSON object containing `messages` — a list of input items. Each item is one of:
 - **Chat message**: an object with a valid `role` ("developer", "assistant", or "user") and corresponding `content`.
-- **Function call**: an object with `type: "function_call"`, `call_id`, `name`, and `arguments` (from a previous tool call response).
+- **Function call**: an object with `type: "function_call"`, `call_id`, `name`, and `arguments` (a JSON object, from a previous tool call response).
 - **Function call output**: an object with `type: "function_call_output"`, `call_id`, and `output` (the result of executing a tool call).
 
 Optionally, you may include:
-- `response_schema` — a JSON schema object to receive a structured JSON response. Follows [JSON Schema](https://json-schema.org/) syntax. You only need to specify `type` and `properties`. Supported types: `string`, `number`, `integer`, `boolean`, `object`, `array`, `enum`, `anyOf`.
 - `tools` — an array of tool definitions the model may call. Each tool must have `type` set to `"function"`, a `name`, and optionally a `description` and `parameters` (a JSON Schema object).
 - `tool_choice` — controls whether the model calls tools. Can be `"auto"` (default), `"none"`, `"required"`, or a specific tool like `{"type": "function", "name": "my_tool"}`.
+- `response_schema` — a (simplified) JSON Schema object describing the shape of the response you want. The root must have `type: "object"`, objects must include a `properties` field, and arrays must include an `items` field. When provided, the model is constrained to produce JSON matching the schema, and the response `output` field will be the parsed object (instead of a `msg` string). You do not need to specify `additionalProperties` or `required` — those are added automatically for every object in your schema.
 
-##### Request Body (Basic Completion)
+If both `tools` and `response_schema` are provided, the model decides which to use. If it calls a tool, you will receive a `tool_calls` response (the schema is ignored for that turn). If it answers directly, the reply conforms to `response_schema` and is returned as a parsed object in `output`. This is useful for agentic loops that should end with a structured final answer.
+
+##### Request Body (Basic Response)
 ```json
 {
     "messages": [
@@ -33,29 +35,6 @@ Optionally, you may include:
             "content": "hey how are you"
         }
     ]
-}
-```
-
-##### Request Body (Structured Output)
-```json
-{
-    "messages": [
-        {
-            "role": "developer",
-            "content": "Extract the student's name and major from their message."
-        },
-        {
-            "role": "user",
-            "content": "My name is Cole and I study Computer Science."
-        }
-    ],
-    "response_schema": {
-        "type": "object",
-        "properties": {
-            "name": { "type": "string" },
-            "major": { "type": "string" }
-        }
-    }
 }
 ```
 
@@ -84,6 +63,35 @@ Optionally, you may include:
 }
 ```
 
+##### Request Body (Structured Output)
+```json
+{
+    "messages": [
+        {
+            "role": "user",
+            "content": "Give me the weather in Madison."
+        }
+    ],
+    "response_schema": {
+        "type": "object",
+        "properties": {
+            "temperature": { "type": "number" },
+            "condition": { "type": "string" }
+        }
+    }
+}
+```
+
+When `response_schema` is provided, a `200` will be sent with `output` set to the parsed object matching your schema...
+```json
+{
+    "output": {
+        "temperature": 72,
+        "condition": "sunny"
+    }
+}
+```
+
 ##### Request Body (Agentic Loop — Feeding Tool Results Back)
 
 After receiving `tool_calls`, you execute the tool and feed the result back by including both the `function_call` and `function_call_output` items in the `messages` array alongside your chat messages.
@@ -99,7 +107,7 @@ After receiving `tool_calls`, you execute the tool and feed the result back by i
             "type": "function_call",
             "call_id": "call_abc123",
             "name": "get_weather",
-            "arguments": "{\"location\":\"Madison\"}"
+            "arguments": { "location": "Madison" }
         },
         {
             "type": "function_call_output",
@@ -122,31 +130,21 @@ The `call_id` in `function_call_output` must match the `call_id` from the origin
 
 #### Response
 
-If the request is successful and no `response_schema` or `tools` were provided, a `200` will be sent containing a `msg` with the AI's response...
+If the request is successful and the model did not call a tool, a `200` will be sent containing a `msg` with the AI's response...
 ```json
 {
     "msg": "I'm just a program, but I'm here and ready to help! How about you? What's on your mind?"
 }
 ```
 
-If the request is successful and a `response_schema` was provided, a `200` will be sent containing a JSON object matching your schema...
-```json
-{
-    "name": "Cole",
-    "major": "Computer Science"
-}
-```
-
-If the request is successful and the model decided to call a tool, a `200` will be sent containing `tool_calls`...
+If the request is successful and the model decided to call a tool, a `200` will be sent containing `tool_calls`. Each call has a `call_id`, `name`, and `arguments` (a JSON object of the tool's arguments)...
 ```json
 {
     "tool_calls": [
         {
-            "type": "function_call",
-            "id": "fc_abc123",
             "call_id": "call_abc123",
             "name": "get_weather",
-            "arguments": "{\"location\":\"Madison\"}"
+            "arguments": { "location": "Madison" }
         }
     ]
 }
@@ -168,19 +166,43 @@ If your list of message objects is malformed, the following `400` will be sent..
 }
 ```
 
-If your `response_schema` is not a valid object, the following `400` will be sent...
-
-```json
-{
-    "msg": "The 'response_schema' must be a JSON schema object."
-}
-```
-
 If your `tools` array is malformed, the following `400` will be sent...
 
 ```json
 {
     "msg": "The 'tools' must be an array of tool objects, each with type 'function' and a 'name'."
+}
+```
+
+If your `response_schema` is malformed or invalid, one of the following `400`s will be sent...
+
+```json
+{
+    "msg": "The 'response_schema' must be a JSON Schema object."
+}
+```
+
+```json
+{
+    "msg": "The 'response_schema' must have type 'object' at the root level."
+}
+```
+
+```json
+{
+    "msg": "Invalid type 'string' at root. Must be one of: string, number, integer, boolean, object, array, null."
+}
+```
+
+```json
+{
+    "msg": "Object schema at root must have a 'properties' object."
+}
+```
+
+```json
+{
+    "msg": "Array schema at root.items must have an 'items' field."
 }
 ```
 

@@ -128,10 +128,10 @@ export class CS571HW11DbConnector {
         return new BadgerMessage(creation.id, creation.poster, creation.title, creation.content, creation.chatroom, creation.created);
     }
 
-    public async getMessages(chatroom: string): Promise<BadgerMessage[]> {
+    public async getMessages(chatroom?: string): Promise<BadgerMessage[]> {
         const tabMsgs = await this.badgerMessagesTable.findAll({
-            limit: 100,
-            where: { chatroom },
+            limit: 10,
+            where: chatroom ? { chatroom } : undefined,
             order: [['created', 'DESC']]
         });
         return tabMsgs.map(tabMsg => new BadgerMessage(tabMsg.id, tabMsg.poster, tabMsg.title, tabMsg.content, tabMsg.chatroom, tabMsg.created))

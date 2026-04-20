@@ -2,12 +2,12 @@
 
 ## At a Glance
 
-All routes are relative to `https://cs571api.cs.wisc.edu/rest/s26/hw11/`
+All routes are relative to `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/`
 
 | Method | URL | Purpose | Return Codes |
 | --- | --- | --- | --- |
 | `GET`| `/chatrooms` | Get all chatrooms. | 200, 304 |
-| `GET` | `/messages?chatroom=NAME&page=NUM`| Get latest messages for specified chatroom and page. | 200, 400, 404 |
+| `GET` | `/messages?chatroom=NAME`| Get the 10 most recent messages, optionally filtered by chatroom. | 200, 404 |
 | `POST` | `/messages?chatroom=NAME` | Posts a message to the specified chatroom. | 200, 400, 404, 413 |
 | `DELETE` | `/messages?id=ID` | Deletes the given message. | 200, 400, 401, 404 |
 | `POST` | `/register` | Registers a user account. | 200, 400, 409, 413  |
@@ -22,7 +22,7 @@ Make sure to include credentials and specify a content-type where appropriate. A
 ## In-Depth Explanations
 
 ### Getting all Chatrooms
-`GET` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chatrooms`
+`GET` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/chatrooms`
 
 A `200` (new) or `304` (cached) response will be sent with the list of all chatrooms.
 
@@ -38,16 +38,15 @@ A `200` (new) or `304` (cached) response will be sent with the list of all chatr
 ]
 ```
 
-### Getting Messages for Chatroom
+### Getting Messages
 
-`GET` `https://cs571api.cs.wisc.edu/rest/s26/hw11/messages?chatroom=CHATROOM_NAME&page=PAGE_NUM`
+`GET` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/messages?chatroom=CHATROOM_NAME`
 
-There is no get all messages; you must get messages for a particular `chatroom`. **All messages are public**, you do *not* need to be logged in to access them. Furthermore, a `page` may be specified. Each `page` contains up to 25 messages, and there are up to 4 pages. Messages made over 100 messages ago are no longer accessible via the API. A `200` (new) or `304` (cached) response will be sent with messages organized from most recent to least recent. Note that the `created` field is in a ISO 8601 format.
+**All messages are public**, you do *not* need to be logged in to access them. The `chatroom` query parameter is optional; if specified, only the 10 most recent messages from that chatroom will be returned, otherwise the 10 most recent messages across all chatrooms will be returned. A `200` (new) or `304` (cached) response will be sent with messages organized from most recent to least recent. Note that the `created` field is in a ISO 8601 format.
 
 ```json
 {
     "msg": "Successfully got the latest messages!",
-    "page": 1,
     "messages": [
         {
             "id": 2,
@@ -69,14 +68,6 @@ There is no get all messages; you must get messages for a particular `chatroom`.
 }
 ```
 
-If an invalid page number is specified, a `400` will be returned.
-
-```json
-{
-    "msg": "A page number must be between 1 and 4."
-}
-```
-
 If a chatroom is specified that does not exist, a `404` will be returned.
 
 ```json
@@ -86,7 +77,7 @@ If a chatroom is specified that does not exist, a `404` will be returned.
 ```
 
 ### Registering a User
-`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/register`
+`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/register`
 
 You must register a user with a specified `username` and 7-digit `pin`.
 
@@ -151,7 +142,7 @@ If the `username` is longer than 64 characters or if the `pin` is longer than 12
 
 ### Logging in to an Account
 
-`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/login`
+`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/login`
 
 You must log a user in with their specified `username` and 7-digit `pin`.
 
@@ -201,7 +192,7 @@ If the `username` or `pin` is incorrect, the following `401` will be sent...
 
 ### Posting a Message
 
-`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/messages?chatroom=CHATROOM_NAME`
+`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/messages?chatroom=CHATROOM_NAME`
 
 Posting a message is a protected operation; you must have a valid `badgerchat_auth` session. The `CHATROOM_NAME` must be specified as a query parameter in the URL, and a `title` and `content` in its request body.
 
@@ -257,7 +248,7 @@ If the `title` is longer than 128 characters or if the `content` is longer than 
 ```
 
 ### Deleting a Message
-`DELETE` `https://cs571api.cs.wisc.edu/rest/s26/hw11/messages?id=MESSAGE_ID`
+`DELETE` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/messages?id=MESSAGE_ID`
 
 Posting a message is a protected operation; you must have a valid `badgerchat_auth` session. The `MESSAGE_ID` must be specified as a query parameter in the URL.
 
@@ -296,7 +287,7 @@ If a message is specified that does not exist, a `404` will be returned.
 ```
 
 ### Logging out
-`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/logout`
+`POST` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/logout`
 
 Logging out will cause the server to respond with a `Set-Cookie` header that will overwrite and delete the `badgerchat_auth`. 
 
@@ -311,7 +302,7 @@ The following `200` will be sent...
 ```
 
 ### Who Am I?
-`GET` `https://cs571api.cs.wisc.edu/rest/s26/hw11/whoami`
+`GET` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/whoami`
 
 This endpoint will check if a user is logged in and who they claim to be, including when their token was issued and when it will expire in Unix epoch time.
 
