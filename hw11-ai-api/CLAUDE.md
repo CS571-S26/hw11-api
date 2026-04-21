@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-This is an Express API that proxies requests to Azure-hosted GPT-5 Mini. It runs on port 58111 and is part of the CS571 course infrastructure (`@cs571/api-framework`).
+This is an Express API that proxies requests to Azure-hosted GPT-5 Nano. It runs on port 58111 and is part of the CS571 course infrastructure (`@cs571/api-framework`).
 
 ### Single unified endpoint: `POST /responses`
 

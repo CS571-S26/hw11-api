@@ -9,7 +9,6 @@ All routes are relative to `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/`
 | `GET`| `/chatrooms` | Get all chatrooms. | 200, 304 |
 | `GET` | `/messages?chatroom=NAME`| Get the 10 most recent messages, optionally filtered by chatroom. | 200, 404 |
 | `POST` | `/messages?chatroom=NAME` | Posts a message to the specified chatroom. | 200, 400, 404, 413 |
-| `DELETE` | `/messages?id=ID` | Deletes the given message. | 200, 400, 401, 404 |
 | `POST` | `/register` | Registers a user account. | 200, 400, 409, 413  |
 | `POST` | `/login` | Logs a user in. | 200, 400, 401 |
 | `POST` | `/logout` | Logs the current user out. | 200 |
@@ -244,45 +243,6 @@ If the `title` is longer than 128 characters or if the `content` is longer than 
 ```json
 {
     "msg": "'title' must be 128 characters or fewer and 'content' must be 1024 characters or fewer"
-}
-```
-
-### Deleting a Message
-`DELETE` `https://cs571api.cs.wisc.edu/rest/s26/hw11/chat/messages?id=MESSAGE_ID`
-
-Posting a message is a protected operation; you must have a valid `badgerchat_auth` session. The `MESSAGE_ID` must be specified as a query parameter in the URL.
-
-Requests must include credentials. There is no request body for this request.
-
-If the delete is successful, the following `200` will be sent...
-
-```json
-{
-    "msg": "Successfully deleted message!"
-}
-```
-
-If authentication fails (such as an expired token), the following `401` will be sent...
-
-```json
-{
-    "msg": "You must be logged in to do that!"
-}
-```
-
-If you try to delete another user's post, the following `401` will be sent...
-
-```json
-{
-    "msg": "You may not delete another user's post!"
-}
-```
-
-If a message is specified that does not exist, a `404` will be returned.
-
-```json
-{
-    "msg": "That message does not exist!"
 }
 ```
 

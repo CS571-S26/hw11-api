@@ -137,7 +137,7 @@ export class CS571AIResponsesRoute implements CS571Route {
                         "Content-Type": "application/json",
                         "api-key": this.secretConfig.AI_RESPONSES_SECRET
                     },
-                    body: JSON.stringify({...openAIBody, model: 'gpt-5-mini'})
+                    body: JSON.stringify({...openAIBody, model: 'gpt-5.4-nano'})
                 });
                 const data = await resp.json();
 

@@ -9,7 +9,6 @@ import HW11SecretConfig from './model/configs/hw11-secret-config';
 import { CS571AllChatroomsRoute } from './routes/chatrooms';
 import { CS571GetMessagesRoute } from './routes/get-messages';
 import { CS571CreateMessageRoute } from './routes/create-message';
-import { CS571DeleteMessageRoute } from './routes/delete-message';
 import { CS571RegisterRoute } from './routes/register';
 import { CS571LoginRoute } from './routes/login';
 import { CS571LogoutRoute } from './routes/logout';
@@ -53,7 +52,6 @@ appBundle.router.addRoutes([
   new CS571AllChatroomsRoute(chatrooms, db),
   new CS571GetMessagesRoute(chatrooms, db),
   new CS571CreateMessageRoute(chatrooms, db, ta),
-  new CS571DeleteMessageRoute(db, ta),
   new CS571RegisterRoute(db, ta, appBundle.config),
   new CS571LoginRoute(db, ta, appBundle.config),
   new CS571LogoutRoute(db, appBundle.config),

@@ -1,6 +1,6 @@
 # CS571 S26 AI API Documentation
 
-Used to generate a response using GPT-5 Mini. **You are responsible for all traffic coming from your `X-CS571-ID`.** Failing to include a valid `X-CS571-ID` will result in a `401`.
+Used to generate a response using GPT-5 Nano. **You are responsible for all traffic coming from your `X-CS571-ID`.** Failing to include a valid `X-CS571-ID` will result in a `401`.
 
 ## AI Responses
 
@@ -38,6 +38,13 @@ If both `tools` and `response_schema` are provided, the model decides which to u
 }
 ```
 
+A `200` will be sent with `msg` set to the AI's response...
+```json
+{
+    "msg": "I'm just a program, but I'm here and ready to help! How about you? What's on your mind?"
+}
+```
+
 ##### Request Body (Tool Use)
 ```json
 {
@@ -58,6 +65,19 @@ If both `tools` and `response_schema` are provided, the model decides which to u
                     "location": { "type": "string" }
                 }
             }
+        }
+    ]
+}
+```
+
+If the model decides to call a tool, a `200` will be sent with `tool_calls`. Each call has a `call_id`, `name`, and `arguments` (a JSON object)...
+```json
+{
+    "tool_calls": [
+        {
+            "call_id": "call_abc123",
+            "name": "get_weather",
+            "arguments": { "location": "Madison" }
         }
     ]
 }
