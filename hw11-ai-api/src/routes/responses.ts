@@ -49,11 +49,53 @@ export class CS571AIResponsesRoute implements CS571Route {
 
             if (tools !== undefined) {
                 if (!Array.isArray(tools) || !tools.every((t: any) =>
+                    t && typeof t === 'object' &&
                     t.type === 'function' &&
                     typeof t.name === 'string'
                 )) {
                     res.status(400).send({
                         msg: "The 'tools' must be an array of tool objects, each with type 'function' and a 'name'."
+                    });
+                    return;
+                }
+                for (const t of tools) {
+                    if (t.description !== undefined && typeof t.description !== 'string') {
+                        res.status(400).send({
+                            msg: `The tool '${t.name}' has an invalid 'description'; it must be a string.`
+                        });
+                        return;
+                    }
+                    if (t.parameters !== undefined) {
+                        if (typeof t.parameters !== 'object' || t.parameters === null || Array.isArray(t.parameters)) {
+                            res.status(400).send({
+                                msg: `The tool '${t.name}' has invalid 'parameters'; it must be a JSON Schema object.`
+                            });
+                            return;
+                        }
+                        if (t.parameters.type !== 'object') {
+                            res.status(400).send({
+                                msg: `The tool '${t.name}' must have 'parameters' with type 'object' at the root level.`
+                            });
+                            return;
+                        }
+                        const schemaError = CS571AIResponsesRoute.validateSchema(t.parameters);
+                        if (schemaError) {
+                            res.status(400).send({
+                                msg: `The tool '${t.name}' has invalid 'parameters': ${schemaError}`
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if (toolChoice !== undefined) {
+                const isValidString = typeof toolChoice === 'string' && ['none', 'auto', 'required'].includes(toolChoice);
+                const isValidObject = typeof toolChoice === 'object' && toolChoice !== null && !Array.isArray(toolChoice) &&
+                    toolChoice.type === 'function' && typeof toolChoice.name === 'string';
+                if (!isValidString && !isValidObject) {
+                    res.status(400).send({
+                        msg: "The 'tool_choice' must be 'none', 'auto', 'required', or an object like { type: 'function', name: 'tool_name' }."
                     });
                     return;
                 }
@@ -179,7 +221,7 @@ export class CS571AIResponsesRoute implements CS571Route {
                 }
             } catch (e) {
                 res.status(500).send({
-                    msg: "An unknown server error occured during exection. Try again in a few minutes."
+                    msg: "An unknown server error occured during exection. Please double-check your request body for validity, then try again in a few minutes."
                 })
             }
 
@@ -192,7 +234,7 @@ export class CS571AIResponsesRoute implements CS571Route {
         }
 
         const isValidMessage = (item: any) => {
-            return item.role && item.content !== undefined &&
+            return typeof item.content === 'string' &&
                    Object.values(OpenAIMessageRole).includes(item.role);
         };
 
@@ -201,7 +243,8 @@ export class CS571AIResponsesRoute implements CS571Route {
                    typeof item.call_id === 'string' &&
                    typeof item.name === 'string' &&
                    typeof item.arguments === 'object' &&
-                   item.arguments !== null;
+                   item.arguments !== null &&
+                   !Array.isArray(item.arguments);
         };
 
         const isValidFunctionCallOutput = (item: any) => {
@@ -223,7 +266,10 @@ export class CS571AIResponsesRoute implements CS571Route {
         const validTypes = ['string', 'number', 'integer', 'boolean', 'object', 'array', 'null'];
 
         const validate = (s: any, path: string = ''): string | null => {
-            if (!s || typeof s !== 'object') return null;
+            const loc = path || 'root';
+            if (s === null || typeof s !== 'object' || Array.isArray(s)) {
+                return `Schema at ${loc} must be an object.`;
+            }
 
             if (s.type && !validTypes.includes(s.type)) {
                 return `Invalid type '${s.type}' at ${path || 'root'}. Must be one of: ${validTypes.join(', ')}.`;
@@ -274,6 +320,7 @@ export class CS571AIResponsesRoute implements CS571Route {
 
         if (result.type === 'object' && result.properties) {
             result.additionalProperties = false;
+            result.required = Object.keys(result.properties);
             for (const key of Object.keys(result.properties)) {
                 result.properties[key] = CS571AIResponsesRoute.prepareSchema(result.properties[key]);
             }

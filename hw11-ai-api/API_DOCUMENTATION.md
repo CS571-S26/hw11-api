@@ -186,11 +186,43 @@ If your list of message objects is malformed, the following `400` will be sent..
 }
 ```
 
-If your `tools` array is malformed, the following `400` will be sent...
+If your `tools` array is malformed, one of the following `400`s will be sent...
 
 ```json
 {
     "msg": "The 'tools' must be an array of tool objects, each with type 'function' and a 'name'."
+}
+```
+
+```json
+{
+    "msg": "The tool 'my_tool' has an invalid 'description'; it must be a string."
+}
+```
+
+```json
+{
+    "msg": "The tool 'my_tool' has invalid 'parameters'; it must be a JSON Schema object."
+}
+```
+
+```json
+{
+    "msg": "The tool 'my_tool' must have 'parameters' with type 'object' at the root level."
+}
+```
+
+```json
+{
+    "msg": "The tool 'my_tool' has invalid 'parameters': Schema at .properties.foo must be an object."
+}
+```
+
+If your `tool_choice` is malformed, the following `400` will be sent...
+
+```json
+{
+    "msg": "The 'tool_choice' must be 'none', 'auto', 'required', or an object like { type: 'function', name: 'tool_name' }."
 }
 ```
 
@@ -223,6 +255,12 @@ If your `response_schema` is malformed or invalid, one of the following `400`s w
 ```json
 {
     "msg": "Array schema at root.items must have an 'items' field."
+}
+```
+
+```json
+{
+    "msg": "Schema at .properties.foo must be an object."
 }
 ```
 
